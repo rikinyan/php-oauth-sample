@@ -1,0 +1,31 @@
+version: "3.7"
+
+services:
+  app_a: 
+    image: "php:8.0-buster"
+    command: sh -c "docker-php-ext-install pdo_mysql && php -S 0.0.0.0:8000 router.php"
+    volumes:  
+      - .:/var/www/html
+    working_dir: /var/www/html
+    ports: 
+      - 8000:8000
+    environment:
+      PASSWORD_HASH_SALT: ${PASSWORD_HASH_SALT}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_PORT: ${MYSQL_PORT}
+
+  mysql:
+    image: "mysql:8.0"
+    restart: always
+    volumes:
+      - mysql_mount:/var/lib/mysql
+    environment: 
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+
+volumes:
+  mysql_mount:
