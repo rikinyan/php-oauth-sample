@@ -1,0 +1,12 @@
+<html>
+  <head>
+  </head>
+  <body onload="accessTokenRedirect()">
+  </body>
+  <script>
+    function accessTokenRedirect() {
+      const urlParams = new URLSearchParams(location.search)
+      location.href = "http://localhost:8000/issue_access_token?" + urlParams.toString()
+    }
+  </script>
+</html>

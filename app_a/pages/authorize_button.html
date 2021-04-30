@@ -1,0 +1,23 @@
+<html>
+  <head>
+  </head>
+  <body onload="addHiddenValue()">
+    <form id="redirect_form" action="http://localhost:8000/issue_authorization_code" method="post">
+      <input type="hidden" name="client">
+      <input type="submit" value="access許可">
+    </form>
+  </body>
+  <script>
+    function addHiddenValue() {
+      const urlParams = new URLSearchParams(location.search)
+      let form = document.getElementById('redirect_form')
+      urlParams.forEach(function(value, key) {
+        let input = document.createElement('input')
+        input.setAttribute('type', 'hidden')
+        input.setAttribute('name', key)
+        input.setAttribute('value', value)
+        form.appendChild(input)
+      })
+    }
+  </script>
+</html>

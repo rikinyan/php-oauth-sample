@@ -3,9 +3,9 @@ version: "3.7"
 services:
   app_a: 
     image: "php:8.0-buster"
-    command: sh -c "docker-php-ext-install pdo_mysql && php -S 0.0.0.0:8000 router.php"
+    command: sh -c "apt-get update -y && apt-get install libpcre3 libpcre3-dev -y && pecl install oauth && docker-php-ext-enable oauth && docker-php-ext-install pdo_mysql  && php -S 0.0.0.0:8000 router_a.php"
     volumes:  
-      - .:/var/www/html
+      - ./app_a:/var/www/html
     working_dir: /var/www/html
     ports: 
       - 8000:8000
@@ -26,6 +26,16 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+
+  app_b:
+    image: "php:8.0-buster"
+    command: sh -c "docker-php-ext-install pdo_mysql && php -S 0.0.0.0:8000 router_b.php"
+    volumes:  
+      - ./app_b:/var/www/html
+    working_dir: /var/www/html
+    ports: 
+      - 3000:8000
+
 
 volumes:
   mysql_mount:
