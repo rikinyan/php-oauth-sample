@@ -2,8 +2,14 @@
   <head>
   </head>
   <body onload="addHiddenValue()">
+    <p>使用するアカウントを入力してください</p>
     <form id="redirect_form" action="http://localhost:8000/issue_authorization_code" method="post">
-      <input type="hidden" name="client">
+      <div>
+        email:<input type="text" name="email">
+      </div>
+      <div>
+        password:<input type="password" name="password">
+      </div>
       <input type="submit" value="access許可">
     </form>
   </body>

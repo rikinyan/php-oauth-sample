@@ -5,8 +5,16 @@
   </body>
   <script>
     function accessTokenRedirect() {
-      const urlParams = new URLSearchParams(location.search)
-      location.href = "http://localhost:8000/issue_access_token?" + urlParams.toString()
+      const currentUrlQueries = new URLSearchParams(location.search)
+      const paramObj = {
+        grant_type: 'authorization_code',
+        code: currentUrlQueries.get('code'),
+        client_id: currentUrlQueries.get('client_id'),
+        user_id: currentUrlQueries.get('user_id'),
+        redirect_url: currentUrlQueries.get('redirect_url'),
+      }
+      const issueAccessTokenParam = new URLSearchParams(paramObj);
+      location.href = "http://localhost:8000/issue_access_token?" + issueAccessTokenParam.toString()
     }
   </script>
 </html>

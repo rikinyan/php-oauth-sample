@@ -18,18 +18,20 @@ class DataBase {
   }
 
   function query(string $statement, array $placeholder_values): PDOStatement {
+    $query = $this->db->prepare($statement);
     if (is_string($statement) && is_array($placeholder_values)) {
       try {
-        $query = $this->db->prepare($statement);
-        return $query->exec($placeholder_values);
+        $query->execute($placeholder_values);
+        return $query;
       } catch (Exception $e) {
         echo "statement error";
-        return null;
+        echo $e;
+        return $query;
       }
     } else {
       echo "please check arguments.";
+      return $query;
     }
-    return null;
   }
 };
 ?>
