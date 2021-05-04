@@ -8,7 +8,7 @@ if (preg_match('/(\/login)$/', $_SERVER['REQUEST_URI'])) {
   if (isset($_POST['email']) && isset($_POST['password'])) {
      
     $hashed_password = hash('sha256', $_POST['password']);
-    $db = new DataBase();
+    $db = new Database();
     $db->connect();
     $user_result = get_user($db, $_POST['email'], $_POST['password']);
     
@@ -65,12 +65,13 @@ else if (preg_match('/^(\/issue_authorization_code)/', $_SERVER['REQUEST_URI']))
    isset($_POST['redirect_url']) &&
    isset($_POST['state'])) {
 
-    $db = new DataBase();
+    $db = new Database();
     $db->connect();
 
     $user_result = get_user($db, $_POST['email'], $_POST['password']);
 
     if ($user_info = $user_result->fetch()) {
+      $_SESSION['authorized_user_id'] = $user_info['user_id'];
 
       $unique_string = $_POST['client_id'].$user_info['user_id'].uniqid();
       $auth_token = hash('sha256', $unique_string);
@@ -84,11 +85,7 @@ else if (preg_match('/^(\/issue_authorization_code)/', $_SERVER['REQUEST_URI']))
       ]);
     
       $query = http_build_query([
-        'response_type' => $_POST['response_type'],
-        'client_id' => $_POST['client_id'],
-        'user_id' => $user_info['user_id'],
         'code' => $auth_token,
-        'state' => $_POST['state']
       ]);
 
       header('Location: '.$_POST['redirect_url'].'?'.$query);
@@ -104,25 +101,15 @@ else if (preg_match('/^(\/issue_authorization_code)/', $_SERVER['REQUEST_URI']))
 }
 
 else if (preg_match('/^(\/issue_access_token)/', $_SERVER['REQUEST_URI'])) {
-  if (isset($_GET['grant_type'])) {
-    if ($_GET['grant_type'] == "authorization_code" && isset($_GET['code'])) {
-      $generate_access_token_request_data = [
-        'grant_type' => 'authorization_code',
-        'code' => $_GET['code'],
-        'redirect_url' => $_GET['redirect_url'],
-        'client_id' => $_GET['client_id'],
-        'user_id' => $_GET['user_id']
-      ];
+  $db = new Database();
+  $db->connect();
 
-      $result = generate_access_token();
-      echo $result;
-      return $result;
-    }
-  }
-  return;
+  $result = generate_access_token($db);
+  echo $result;
+  return $result;
 } 
 
-function get_user(DataBase $db, string $email, string $password): PDOStatement {
+function get_user(Database $db, string $email, string $password): PDOStatement {
   $hashed_password = hash('sha256', $password);
 
   $user_result = $db->query('select * from user where email = ? and password = ?',
@@ -130,39 +117,31 @@ function get_user(DataBase $db, string $email, string $password): PDOStatement {
   return $user_result;
 }
 
-function generate_access_token() {
-  if (isset($_GET['grant_type'])) {
-    if ($_GET['grant_type'] == 'authorization_code' && isset($_GET['code'])) {
-      $db = new DataBase();
-      $db->connect();
-      $client_statement = 'select count(*) as client_count from client where client_id = ?';
-      $statement_values = [$_GET['client_id']];
-      $result = $db->query($client_statement, $statement_values);
+function generate_access_token(Database $db) {
+  if (isset($_POST['grant_type'])) {
+    if ($_POST['grant_type'] == 'authorization_code' &&
+     isset($_POST['code']) &&
+     isset($_POST['redirect_url']) &&
+     isset($_POST['client_id'])) {
 
-      if ($result->fetch()['client_count'] > 0) {
+      $update_auth_code_state = 'update auth_code set is_activated = 1 where auth_code = ?';
+      $update_auth_code_state_values = [$_POST['code']];
+      $result = $db->query($update_auth_code_state, $update_auth_code_state_values);
 
-        $update_auth_code_state = 'update auth_code set is_activated = 1 where auth_code = ?';
-        $update_auth_code_state_values = [$_GET['code']];
-        $result = $db->query($update_auth_code_state, $update_auth_code_state_values);
+      $access_token = bin2hex(OAuthProvider::generateToken('100'));
+      $register_access_token_state = 'insert into access_token(access_token, client_id, user_id, expired_at) values (?, ?, ?, ?)';
+      $register_access_token =[
+        $access_token,
+        $_POST['client_id'],
+        $_SESSION['user_id'],
+        (new DateTime())->add(new DateInterval('P1Y'))->format('Y-m-d H:i:s')
+      ];
+      $db->query($register_access_token_state, $register_access_token);
 
-        $access_token = bin2hex(OAuthProvider::generateToken('100'));
-        $register_access_token_state = 'insert into access_token(access_token, client_id, user_id, expired_at) values (?, ?, ?, ?)';
-        $register_access_token =[
-          $access_token,
-          $_GET['client_id'],
-          $_GET['user_id'],
-          (new DateTime())->add(new DateInterval('P1Y'))->format('Y-m-d H:i:s')
-        ];
-        $db->query($register_access_token_state, $register_access_token);
-
-        $response = [
-          'access_token' => $access_token
-        ];
-        return json_encode($response);
-
-      } else {
-        return "there aren't client...<bn> please create client.";;
-      }
+      $response = [
+        'access_token' => $access_token
+      ];
+      return json_encode($response);
     }
   }
 }

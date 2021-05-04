@@ -13,8 +13,15 @@
         user_id: currentUrlQueries.get('user_id'),
         redirect_url: currentUrlQueries.get('redirect_url'),
       }
-      const issueAccessTokenParam = new URLSearchParams(paramObj);
-      location.href = "http://localhost:8000/issue_access_token?" + issueAccessTokenParam.toString()
+      const issueAccessTokenParam = new URLSearchParams(paramObj);      
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', 'http://localhost:8000/issue_access_token');
+      xhr.send(issueAccessTokenParam.toString())
+      xhr.onreadystatechange = function() {
+        if(xhr.readyState == 4) {
+          
+        }
+      }
     }
   </script>
 </html>
