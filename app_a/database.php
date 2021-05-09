@@ -4,7 +4,7 @@ class Database {
 
   function connect() {
     try {
-      $mysql_user = $_ENV['MYSQL_USER'];
+      $mysql_user = 'aaa';
       $mysql_password = $_ENV['MYSQL_PASSWORD'];
       $mysql_dbs = 'mysql:host=mysql;port='.$_ENV['MYSQL_PORT'].';dbname='.$_ENV['MYSQL_DATABASE'];
       $this->db = new PDO(
@@ -13,7 +13,7 @@ class Database {
         $mysql_password
       );
     } catch(Exception $e) {
-      echo 'db connection error';
+      redirectError('db connection error');
     }
   }
 
@@ -24,14 +24,16 @@ class Database {
         $query->execute($placeholder_values);
         return $query;
       } catch (Exception $e) {
-        echo "statement error";
-        echo $e;
-        return $query;
+        redirectError('db statement error');
       }
     } else {
-      echo "please check arguments.";
-      return $query;
+      redirectError('please check auguments');
     }
   }
 };
+
+function redirectError(string $message) {
+  header('Location: http://localhost:8000/error_page');
+  echo $message;
+}
 ?>

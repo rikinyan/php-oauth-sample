@@ -9,6 +9,7 @@ if (preg_match('/(\/login)$/', $_SERVER['REQUEST_URI'])) {
     $hashed_password = hash('sha256', $_POST['password']);
     $db = new Database();
     $db->connect();
+
     $user_result = get_user($db, $_POST['email'], $_POST['password']);
     
     if ($first_found_user = $user_result->fetch()) {
@@ -69,6 +70,7 @@ else if (preg_match('/^(\/authorize)/', $_SERVER['REQUEST_URI'])) {
 }
 
 else if (preg_match('/^(\/issue_authorization_code)/', $_SERVER['REQUEST_URI'])) {
+
   if (isset($_POST['email']) && isset($_POST['password']) &&
    isset($_POST['response_type']) && $_POST['response_type'] == 'code' &&
    isset($_POST['client_id']) &&
@@ -167,6 +169,11 @@ function generate_access_token(Database $db) {
       return json_encode($response);
     }
   }
+}
+
+function redirectError(Exception $exception) {
+  header('Location: http://localhost:8000/error_page');
+  echo $exception->getMessage();
 }
 
 require('pages/index.php');
