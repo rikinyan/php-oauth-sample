@@ -9,7 +9,7 @@
     <form method="post" action="http://localhost:8000/auth">
       <input type="hidden" name="response_type" value="code">
       <input type="hidden" name="client_id" value="1">
-      <input type="hidden" name="redirect_url" value="http://localhost:3000/auth_redirect">
+      <input type="hidden" name="redirect_url" value="http://localhost:3000/auth_redirect/">
       <input type="hidden" name="state" value="aaa">
       <input type="submit">
     </form>

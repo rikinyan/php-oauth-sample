@@ -10,18 +10,30 @@
         grant_type: 'authorization_code',
         code: currentUrlQueries.get('code'),
         client_id: currentUrlQueries.get('client_id'),
-        user_id: currentUrlQueries.get('user_id'),
-        redirect_url: currentUrlQueries.get('redirect_url'),
+        redirect_url: location.origin + "/",
+        user_id: currentUrlQueries.get('user_id') 
       }
-      const issueAccessTokenParam = new URLSearchParams(paramObj);      
-      var xhr = new XMLHttpRequest();
-      xhr.open('POST', 'http://localhost:8000/issue_access_token');
-      xhr.send(issueAccessTokenParam.toString())
-      xhr.onreadystatechange = function() {
-        if(xhr.readyState == 4) {
-          
-        }
+
+      const requestParam = new URLSearchParams(paramObj)
+
+      let tokenRequest = new Request('http://localhost:8000/issue_access_token/')
+      const tokenRequestInit = {
+        method: 'post',
+        headers: {
+          "Content-type": "application/x-www-form-urlencoded; charset=UTF-8"
+        },
+        body: requestParam.toString()
       }
+
+      fetch(tokenRequest, tokenRequestInit)
+      .then(function(response) {
+        console.log(tokenRequest.body)
+        console.log(response)
+        return response.json()
+      })
+      .then(function(json) {
+        console.log(json)
+      })
     }
   </script>
 </html>
