@@ -48,4 +48,11 @@ class OauthTemporarilyUnavailableException extends Exception {
     parent::__construct('現在リソースは利用できません。');
   }
 }
+
+class OauthInvalidUserException extends Exception {
+  function __construct() 
+  {
+    parent::__construct('そのユーザは存在しないか、利用できません。');
+  }
+}
 ?>

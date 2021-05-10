@@ -13,7 +13,7 @@ class Database {
         $mysql_password
       );
     } catch(Exception $e) {
-      redirectError('db connection error');
+      redirectDBError('db connection error');
     }
   }
 
@@ -24,15 +24,15 @@ class Database {
         $query->execute($placeholder_values);
         return $query;
       } catch (Exception $e) {
-        redirectError('db statement error');
+        redirectDBError('db statement error');
       }
     } else {
-      redirectError('please check auguments');
+      redirectDBError('please check auguments');
     }
   }
 };
 
-function redirectError(string $message) {
+function redirectDBError(string $message) {
   header('Location: http://localhost:8000/error_page');
   echo $message;
 }

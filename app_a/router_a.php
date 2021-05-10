@@ -1,10 +1,18 @@
 <?php
 require('database.php');
+require('OAuth2.php');
+
+if (preg_match('/(\/error_page)$/', $_SERVER['REQUEST_URI'])) {
+  return;
+}
 
 session_start();
+$db = new Database();
+$db->connect();
+$oauth = new OAuth2($db);
 
 if (preg_match('/(\/login)$/', $_SERVER['REQUEST_URI'])) {
-  session_reset();
+  /*session_reset();
   if (isset($_POST['email']) && isset($_POST['password'])) {
     $hashed_password = hash('sha256', $_POST['password']);
     $db = new Database();
@@ -23,7 +31,7 @@ if (preg_match('/(\/login)$/', $_SERVER['REQUEST_URI'])) {
 
   } else {
     echo "required data ない";
-  }
+  }*/
   return;
 }
 
@@ -34,19 +42,12 @@ else if (preg_match('/(\/logout)$/', $_SERVER['REQUEST_URI'])) {
 }
 
 else if (preg_match('/(\/auth)$/', $_SERVER['REQUEST_URI'])) {
+  
   if (isset($_POST['response_type']) &&
     isset($_POST['client_id']) &&
     isset($_POST['redirect_url']) &&
     isset($_POST['state'])) {
-      $db = new Database();
-      $db->connect();
-
-      $client_check_result = $db->query('select count(*) as client_count from client where client_id = ? and redirect_url = ?',[
-        $_POST['client_id'],
-        $_POST['redirect_url']
-      ]);
-
-      if ($client_check_result->fetch()['client_count'] <= 0) {
+      if (!$oauth->is_valid_client($_POST['client_id'], $_POST['redirect_url'])) {
         return;
       }
 
@@ -77,35 +78,16 @@ else if (preg_match('/^(\/issue_authorization_code)/', $_SERVER['REQUEST_URI']))
    isset($_POST['redirect_url']) &&
    isset($_POST['state'])) {
 
-    $db = new Database();
-    $db->connect();
+    $auth_token = $oauth->generate_authorization_code($_POST['client_id'], $_POST['email'], $_POST['password']);
+  
+    $query = http_build_query([
+      'code' => $auth_token,
+      'client_id' => $_POST['client_id'],
+      'user_id' => $user_info['user_id']
+    ]);
 
-    $user_result = get_user($db, $_POST['email'], $_POST['password']);
-    if ($user_info = $user_result->fetch()) {
-      
-      $unique_string = $_POST['client_id'].$user_info['user_id'].uniqid();
-      $auth_token = hash('sha256', $unique_string);
-
-      $db->query('insert into auth_code(auth_code, client_id, is_activated, expired_at) values(?, ?, ?, ?)',
-      [
-        $auth_token,
-        $_POST['client_id'],
-        false,
-        (new DateTime())->add(new DateInterval('PT1H')) -> format('Y-m-d H:i:s')
-      ]);
-    
-      $query = http_build_query([
-        'code' => $auth_token,
-        'client_id' => $_POST['client_id'],
-        'user_id' => $user_info['user_id']
-      ]);
-
-      header('Location: '.$_POST['redirect_url'].'?'.$query);
-      return;
-    } else {
-      echo 'no_user';
-      return;
-    }
+    header('Location: '.$_POST['redirect_url'].'?'.$query);
+    return;
   }
 }
 
@@ -113,20 +95,20 @@ else if (preg_match('/^(\/issue_access_token)/', $_SERVER['REQUEST_URI'])) {
   header("Access-Control-Allow-Origin: http://localhost:3000");
   header('Content-Type: application/json');
 
-  $db = new Database();
-  $db->connect();
-  $result = generate_access_token($db);
-  echo $result;
-  return $result;
+  if (isset($_POST['grant_type'])) {
+    if ($_POST['grant_type'] == 'authorization_code' &&
+     isset($_POST['code']) &&
+     isset($_POST['redirect_url']) &&
+     isset($_POST['client_id']) &&
+     isset($_POST['user_id'])) {
+      $result = $oauth->generate_access_token($_POST['client_id'], $_POST['user_id']);
+      return $result;
+    }
+  }
+
+  throw new OauthInvalidRequestException();
+  return;
 } 
-
-function get_user(Database $db, string $email, string $password): PDOStatement {
-  $hashed_password = hash('sha256', $password);
-
-  $user_result = $db->query('select * from user where email = ? and password = ?',
-              [$email, $hashed_password]);
-  return $user_result;
-}
 
 function generate_access_token(Database $db) {
   if (isset($_POST['grant_type'])) {
@@ -173,7 +155,7 @@ function generate_access_token(Database $db) {
 
 function redirectError(Exception $exception) {
   header('Location: http://localhost:8000/error_page');
-  echo $exception->getMessage();
+  //echo $exception;
 }
 
 require('pages/index.php');
