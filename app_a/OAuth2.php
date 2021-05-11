@@ -33,14 +33,17 @@ class OAuth2 {
   }
 
   function is_valid_client(int $client_id, string $redirect_url) {
-    echo $redirect_url;
-    $client_check_result = $this->db->query('select count(*) as client_count from client where client_id = ? and redirect_url = ?',[
-      $client_id, $redirect_url
+    $client_check_result = $this->db->query('select count(*) as client_count from client where client_id = ? and redirect_url = ?',
+    [
+      $client_id, 
+      $redirect_url
     ]);
 
     if ($client_check_result->fetch()['client_count'] <= 0) {
       throw new OauthUnauthorizedClientException();
+      return false;
     }
+    return true;
   }
 
   function generate_authorization_code(string $client_id, string $email, string $password): string {

@@ -1,5 +1,5 @@
-
 <?php
+
 class OauthInvalidRequestException extends Exception {
   function __construct() 
   {

@@ -1,12 +1,15 @@
 <?php
-require('database.php');
-require('OAuth2.php');
+session_start();
+
+require_once('database.php');
+require_once('OAuth2.php');
 
 if (preg_match('/(\/error_page)$/', $_SERVER['REQUEST_URI'])) {
   return;
 }
 
-session_start();
+
+
 $db = new Database();
 $db->connect();
 $oauth = new OAuth2($db);
@@ -79,7 +82,8 @@ else if (preg_match('/^(\/issue_authorization_code)/', $_SERVER['REQUEST_URI']))
    isset($_POST['state'])) {
 
     $auth_token = $oauth->generate_authorization_code($_POST['client_id'], $_POST['email'], $_POST['password']);
-  
+    $user_info = $oauth->get_user($_POST['email'], $_POST['password']);
+
     $query = http_build_query([
       'code' => $auth_token,
       'client_id' => $_POST['client_id'],
@@ -154,7 +158,8 @@ function generate_access_token(Database $db) {
 }
 
 function redirectError(Exception $exception) {
-  header('Location: http://localhost:8000/error_page');
+  
+  //header('Location: http://localhost:8000/error_page');
   //echo $exception;
 }
 

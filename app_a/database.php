@@ -4,7 +4,7 @@ class Database {
 
   function connect() {
     try {
-      $mysql_user = 'aaa';
+      $mysql_user = $_ENV['MYSQL_USER'];
       $mysql_password = $_ENV['MYSQL_PASSWORD'];
       $mysql_dbs = 'mysql:host=mysql;port='.$_ENV['MYSQL_PORT'].';dbname='.$_ENV['MYSQL_DATABASE'];
       $this->db = new PDO(
@@ -13,7 +13,7 @@ class Database {
         $mysql_password
       );
     } catch(Exception $e) {
-      redirectDBError('db connection error');
+      redirectDBError($e->getMessage());
     }
   }
 
