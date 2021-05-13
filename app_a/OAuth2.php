@@ -18,21 +18,84 @@ class OAuth2 {
     $this->db = $db;
   }
 
-  function exist_grant_type(string $grant_type) {
+  public function get_approving_authorization_redirect_query_process() {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') { throw new OauthInvalidRequestException(); }
+    
+    if (isset($_POST['response_type']) &&
+    isset($_POST['client_id']) &&
+    isset($_POST['redirect_url'])) {
+      if ($this->check_exist_response_type($_POST['response_type'])) { throw new OauthUnsupportedResponseTypeException(); }
+      if (!$this->check_client($_POST['client_id'], $_POST['redirect_url'])) { throw new OauthUnauthorizedClientException(); }
+
+      return $query = http_build_query([
+        'response_type' => $_POST['response_type'],
+        'client_id' => $_POST['client_id'],
+        'redirect_url' => $_POST['redirect_url'],
+        'state' => $_POST['state']
+      ]);
+    }
+  }
+
+  public function get_authorization_code_query_process() {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') { throw new OauthInvalidRequestException(); }
+
+    if (isset($_POST['email']) && isset($_POST['password']) &&
+    isset($_POST['response_type']) && $_POST['response_type'] == 'code' &&
+    isset($_POST['client_id']) &&
+    isset($_POST['redirect_url']) &&
+    isset($_POST['state'])) {
+      if (!$this->check_exist_response_type($_POST['response_type'])) { throw new OauthUnsupportedResponseTypeException(); }
+      $user_info = $this->get_user($_POST['email'], $_POST['password']);
+      if (count($user_info) <= 0 ) { throw new OauthInvalidUserException; }
+      if (!$this->check_client($_POST['client_id'], $_POST['redirect_url'])) { throw new OauthUnauthorizedClientException; }
+
+      $auth_token = $this->generate_authorization_code($_POST['client_id'], $_POST['email'], $_POST['password']);
+
+      return http_build_query([
+        'code' => $auth_token,
+        'client_id' => $_POST['client_id'],
+        'user_id' => $user_info['user_id']
+      ]);
+    } else {
+      throw new OauthInvalidRequestException();
+    }
+  }
+
+  public function get_access_token_json_process() {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') { throw new OauthInvalidRequestException(); }
+
+    if (isset($_POST['grant_type']) &&
+      isset($_POST['code']) &&
+      isset($_POST['redirect_url']) &&
+      isset($_POST['client_id']) &&
+      isset($_POST['user_id'])) {
+      if (!$this->check_exist_grant_type($_POST['grant_type'])) { throw new OauthInvalidRequestException(); }
+      if (!$this->check_available_authorization_code($_POST['code'])) { throw new OauthInvalidRequestException(); }
+      if (!$this->check_client($_POST['client_id'], $_POST['redirect_url'])) { throw new OauthUnauthorizedClientException(); }
+      if (!$this->check_user_by_id($_POST['user_id'])) { throw new OauthInvalidRequestException(); }
+      $this->activate_authorization_code($_POST['code']);
+      $result = $this->generate_access_token($_POST['client_id'], $_POST['user_id']);
+      return json_encode(["token" => $result]);
+    } else {
+    throw new OauthInvalidRequestException();
+    }
+  }
+
+  private function check_exist_grant_type(string $grant_type) {
     if (in_array($grant_type, OAuth2::$grant_types, true)) {
       return true;
     }
     return false;
   }
 
-  function exist_response_type(string $response_type) {
+  private function check_exist_response_type(string $response_type) {
     if (in_array($response_type, OAuth2::$response_types, true)) {
       return true;
     }
-    throw new OauthUnsupportedResponseTypeException();
+    return false;
   }
 
-  function is_valid_client(int $client_id, string $redirect_url) {
+  private function is_valid_client(int $client_id, string $redirect_url) {
     $client_check_result = $this->db->query('select count(*) as client_count from client where client_id = ? and redirect_url = ?',
     [
       $client_id, 
@@ -40,13 +103,12 @@ class OAuth2 {
     ]);
 
     if ($client_check_result->fetch()['client_count'] <= 0) {
-      throw new OauthUnauthorizedClientException();
       return false;
     }
     return true;
   }
 
-  function generate_authorization_code(string $client_id, string $email, string $password): string {
+  private function generate_authorization_code(string $client_id, string $email, string $password): string {
     $user_data = $this->get_user($email, $password);
 
     $unique_string = $client_id.$user_data['user_id'].uniqid();
@@ -63,19 +125,7 @@ class OAuth2 {
     return $auth_token;
   }
 
-  function issue_access_token(string $client_id, string $user_id, string $auth_code) {
-    if ($this->available_authorization_code($auth_code)) {
-      $update_auth_code_state = 'update auth_code set is_activated = 1 where auth_code = ?';
-      $update_auth_code_state_values = [$auth_code];
-      $this->db->query($update_auth_code_state, $update_auth_code_state_values);
-    } else {
-      throw new OauthInvalidRequestException();
-    }
-    
-    return $this->generate_access_token($client_id, $user_id);
-  }
-
-  function get_user(string $email, string $password) {
+  private function get_user(string $email, string $password): array {
     $hashed_password = hash('sha256', $password);
   
     $user_result = $this->db->query('select * from user where email = ? and password = ?',
@@ -83,22 +133,46 @@ class OAuth2 {
     if ($user_result->rowCount() == 1) {
       return $user_result->fetch();
     } else {
-      throw new OauthInvalidUserException();
+      return [];
     }
   }
 
-  function available_authorization_code(string $auth_code) {
+  private function check_user_by_id(int $user_id): bool {
+    $check_user_result = $this->db->query('select count(*) as user_count from user where user_id = ?', [
+      $user_id
+    ]);
+
+    if ($check_user_result->fetch()['user_count'] == 1) {
+      return true;
+    } else {
+      return false;
+    } 
+  }
+
+  private function check_client($client_id, $redirect_url): bool {
+    $check_client_result = $this->db->query('select count(*) as client_count from client where client_id = ? and redirect_url = ?', [
+      $client_id, $redirect_url
+    ]);
+
+    if ($check_client_result->fetch()['client_count'] == 1) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  private function check_available_authorization_code(string $auth_code): bool {
     $auth_code_result = $this->db->query('select * from auth_code where auth_code = ? and is_activated = 0 and expired_data >= ?', 
     [$auth_code, date('Y-m-d H:i:s')]);
     return $auth_code_result->rowCount() == 1;
   }
 
-  function activate_authorization_code(string $auth_code) {
+  private function activate_authorization_code(string $auth_code) {
     $update_auth_code_state = 'update auth_code set is_activated = 1 where auth_code = ?';
     $this->db->query($update_auth_code_state, [$auth_code]); 
   }
 
-  function generate_access_token(string $client_id, string $user_id) {
+  private function generate_access_token(string $client_id, string $user_id) {
     $access_token = bin2hex(OAuthProvider::generateToken('100'));
     $register_access_token_state = 'insert into access_token(access_token, client_id, user_id, expired_at) values (?, ?, ?, ?)';
     $register_access_token = [

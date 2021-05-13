@@ -8,8 +8,6 @@ if (preg_match('/(\/error_page)$/', $_SERVER['REQUEST_URI'])) {
   return;
 }
 
-
-
 $db = new Database();
 $db->connect();
 $oauth = new OAuth2($db);
@@ -46,115 +44,33 @@ else if (preg_match('/(\/logout)$/', $_SERVER['REQUEST_URI'])) {
 
 else if (preg_match('/(\/auth)$/', $_SERVER['REQUEST_URI'])) {
   
-  if (isset($_POST['response_type']) &&
-    isset($_POST['client_id']) &&
-    isset($_POST['redirect_url']) &&
-    isset($_POST['state'])) {
-      if (!$oauth->is_valid_client($_POST['client_id'], $_POST['redirect_url'])) {
-        return;
-      }
+  $query = $oauth->get_approving_authorization_redirect_query_process();
 
-      $query = http_build_query([
-        'response_type' => $_POST['response_type'],
-        'client_id' => $_POST['client_id'],
-        'redirect_url' => $_POST['redirect_url'],
-        'state' => $_POST['state']
-      ]);
-
-      $_SESSION['state'] = $_POST['state'];
-      header("Access-Control-Allow-Origin: http://localhost:3000");
-      header('Location: http://localhost:8000/authorize?'.$query);
-    }
-  return;
+  header("Access-Control-Allow-Origin: http://localhost:3000");
+  header('Location: http://localhost:8000/authorize?'.$query);
+  exit();
 }
 
 else if (preg_match('/^(\/authorize)/', $_SERVER['REQUEST_URI'])) {
   readfile('pages/authorize_button.html');
-  return;
+  exit();
 }
 
 else if (preg_match('/^(\/issue_authorization_code)/', $_SERVER['REQUEST_URI'])) {
 
-  if (isset($_POST['email']) && isset($_POST['password']) &&
-   isset($_POST['response_type']) && $_POST['response_type'] == 'code' &&
-   isset($_POST['client_id']) &&
-   isset($_POST['redirect_url']) &&
-   isset($_POST['state'])) {
+  $query = $oauth->get_authorization_code_query_process();
 
-    $auth_token = $oauth->generate_authorization_code($_POST['client_id'], $_POST['email'], $_POST['password']);
-    $user_info = $oauth->get_user($_POST['email'], $_POST['password']);
-
-    $query = http_build_query([
-      'code' => $auth_token,
-      'client_id' => $_POST['client_id'],
-      'user_id' => $user_info['user_id']
-    ]);
-
-    header('Location: '.$_POST['redirect_url'].'?'.$query);
-    return;
-  }
+  header('Location: '.$_POST['redirect_url'].'?'.$query);
+  return;
 }
 
 else if (preg_match('/^(\/issue_access_token)/', $_SERVER['REQUEST_URI'])) {
+
+  $json_response = $oauth->get_access_token_json_process();
   header("Access-Control-Allow-Origin: http://localhost:3000");
   header('Content-Type: application/json');
 
-  if (isset($_POST['grant_type'])) {
-    if ($_POST['grant_type'] == 'authorization_code' &&
-     isset($_POST['code']) &&
-     isset($_POST['redirect_url']) &&
-     isset($_POST['client_id']) &&
-     isset($_POST['user_id'])) {
-      $result = $oauth->generate_access_token($_POST['client_id'], $_POST['user_id']);
-      return $result;
-    }
-  }
-
-  throw new OauthInvalidRequestException();
-  return;
-} 
-
-function generate_access_token(Database $db) {
-  if (isset($_POST['grant_type'])) {
-    if ($_POST['grant_type'] == 'authorization_code' &&
-     isset($_POST['code']) &&
-     isset($_POST['redirect_url']) &&
-     isset($_POST['client_id'])) {
-      
-
-      $auth_code_result = $db->query('select * from auth_code where auth_code = ?', [$_POST['code']]);
-      $fetch_auth_code = $auth_code_result->fetch();
-
-      
-      if ($auth_code_result->rowCount() == 1 && 
-      $fetch_auth_code != false &&
-      $fetch_auth_code['is_activated'] == 0 &&
-      $fetch_auth_code['expired_at'] >= date('Y-m-d H:i:s')
-      ) {
-        $update_auth_code_state = 'update auth_code set is_activated = 1 where auth_code = ?';
-        $update_auth_code_state_values = [$_POST['code']];
-        $db->query($update_auth_code_state, $update_auth_code_state_values);
-      } else {
-        return;
-      }
-
-      
-      $access_token = bin2hex(OAuthProvider::generateToken('100'));
-      $register_access_token_state = 'insert into access_token(access_token, client_id, user_id, expired_at) values (?, ?, ?, ?)';
-      $register_access_token =[
-        $access_token,
-        $_POST['client_id'],
-        $_POST['user_id'],
-        (new DateTime())->add(new DateInterval('P1Y'))->format('Y-m-d H:i:s')
-      ];
-      $db->query($register_access_token_state, $register_access_token);
-
-      $response = [
-        'access_token' => $access_token
-      ];
-      return json_encode($response);
-    }
-  }
+  return $json_response;
 }
 
 function redirectError(Exception $exception) {
